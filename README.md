@@ -1,8 +1,19 @@
 # J-NPCs: Simulador de Economia com IA (PPO Actor-Critic + Multi-Head Attention)
 
-Este repositório contém a arquitetura de Inteligência Artificial para um simulador de economia headless focado em NPCs autônomos. Os NPCs utilizam Aprendizado por Reforço (PPO - Proximal Policy Optimization) estruturado em uma rede neural Actor-Critic combinada com um poderoso mecanismo de Atenção Multi-Head para tomada de decisão dinâmica com base no ambiente ao seu redor.
+Este repositório contém a arquitetura de Inteligência Artificial para um simulador de economia headless focado em NPCs autônomos. Os NPCs utilizam Aprendizado por Reforço (PPO - Proximal Policy Optimization) combinado com Multi-Head Attention para tomadas de decisão intelligentes.
 
 O projeto foi totalmente modularizado para melhor organização, manutenibilidade e escalabilidade, contendo também tipagem estática completa (`Type Hints`) e documentação em Português Brasileiro.
+
+---
+
+## 📚 Documentação Principal
+
+- **[IMPLEMENTATION.md](./IMPLEMENTATION.md)** ⭐ - **Guia Completo de Implementação**
+  - Como usar o modelo já treinado (3 níveis de abstração)
+  - Como adicionar novos tipos de dados (padrão de 3 passos)
+  - Como treinar o modelo (PPOTrainer)
+  - Exemplos práticos e código pronto para usar
+  - Princípio de abstração para facilitar o uso
 
 ---
 
@@ -14,11 +25,14 @@ A arquitetura do software é dividida em módulos independentes localizados na p
 .
 ├── j-npcs.py            # Ponto de entrada do simulador (executa a simulação de teste)
 ├── README.md            # Documentação completa do projeto
+├── IMPLEMENTATION.md    # Guia prático de implementação
 └── src/
     ├── __init__.py      # Inicializador do pacote Python
     ├── config.py        # Configurações globais e constantes da simulação
     ├── environment.py   # Classe EconomicEnv (Ambiente Gymnasium customizado)
     ├── brain.py         # Classe NPCBrain (Rede Neural PyTorch)
+    ├── training.py      # Classe PPOTrainer (Treinamento com PPO)
+    ├── inference.py     # Classe NPCInference (Interface simplificada)
     └── main.py          # Script principal de execução da simulação
 ```
 
@@ -26,7 +40,7 @@ A arquitetura do software é dividida em módulos independentes localizados na p
 
 ## 🧠 Arquitetura de Inteligência Artificial
 
-A inteligência de cada NPC é modelada por meio de uma arquitetura **Actor-Critic (PPO)** que combina o processamento das necessidades internas com informações contextuais do mundo físico ao redor usando **Atenção (Multi-Head Attention)**.
+A inteligência de cada NPC é modelada por meio de uma arquitetura **Actor-Critic (PPO)** que combina o processamento das necessidades internas com informações contextuais do mundo físico ao redor.
 
 ```
                     ┌─────────────────────────┐
@@ -39,12 +53,12 @@ A inteligência de cada NPC é modelada por meio de uma arquitetura **Actor-Crit
                                 ▼ [Query]
                       ┌───────────────────┐
                       │    Mecanismo de   │◄── [ Node Embedding (Linear) ] ── [ Edifícios Próximos ]
-                      │ Atenção Multi-Head│
-                      └─────────┬─────────┘
-                                │
+                      │ Atenção Multi-Head│◄── [ Building Embedding ] ── [ Dados dos Edifícios ]
+                      └─────────┬─────────┤
+                                │         │
                                 ▼ [Vetor de Contexto]
                       ┌───────────────────┐
-                      │ Camada de Fusão   │ (Estado Interno + Contexto do Mapa)
+                      │ Camada de Fusão   │ (Estado Interno + Contexto do Mapa + Inimigos)
                       └─────────┬─────────┘
                                 │
                                 ├───► [ Actor Head ]  ──► Distribuição de Ações (Probabilidade)
@@ -53,10 +67,10 @@ A inteligência de cada NPC é modelada por meio de uma arquitetura **Actor-Crit
 ```
 
 ### 1. Processamento de Necessidades (Via 1)
-O estado interno do NPC (Fome, Energia, Dinheiro e Profissão) é processado através de uma rede neural totalmente conectada (MLP) definida em `src/brain.py`. Este vetor de tamanho 4 é projetado em uma representação latente rica com dimensão de tamanho 32, servindo como a **Query (Consulta)** para o mecanismo de atenção.
+O estado interno do NPC (Fome, Energia, Dinheiro e Profissão) é processado através de uma rede neural totalmente conectada (MLP) definida em `src/brain.py`. Este vetor de tamanho 4 é projetado em um espaço latente de 32 dimensões.
 
 ### 2. Processamento Espacial / Nós Semânticos (Via 2)
-O NPC enxerga até 5 edifícios próximos ao mesmo tempo. Cada edifício possui uma assinatura semântica com 10 tokens de recurso. Essas assinaturas são mapeadas para um espaço latente de dimensão 32, servindo como as **Keys (Chaves)** e **Values (Valores)** para o mecanismo de atenção.
+O NPC enxerga até 5 edifícios próximos ao mesmo tempo. Cada edifício possui uma assinatura semântica com 10 tokens de recurso, além de 4 dados estruturados (preço, estoque, qualidade, distância). Essas assinaturas são mapeadas para um espaço latente de dimensão 32.
 
 ### 3. Mecanismo de Atenção Multi-Head
 Utilizando a camada `nn.MultiheadAttention`, o NPC cruza ativamente suas necessidades com as oportunidades presentes no ambiente físico.
@@ -64,7 +78,7 @@ Utilizando a camada `nn.MultiheadAttention`, o NPC cruza ativamente suas necessi
 * **Query (Q):** O que o NPC quer ou precisa no momento (ex: se está com muita fome, a consulta expressará alta necessidade de comida).
 * **Keys (K) & Values (V):** O que cada edifício ao redor oferece ou representa (ex: um mercado que vende comida terá uma chave correspondente).
 
-A atenção permite que o NPC decida, dinamicamente, em qual edifício ele deve focar sua atenção de acordo com seu estado interno, produzindo um **Vetor de Contexto** que consolida de forma inteligente o cenário atual.
+A atenção permite que o NPC decida, dinamicamente, em qual edifício ele deve focar sua atenção de acordo com seu estado interno, produzindo um **Vetor de Contexto** que consolida de forma inteligente as informações disponíveis.
 
 ### 4. Fusão e Tomada de Decisão (Actor-Critic)
 O vetor de contexto é concatenado ao estado interno do NPC, resultando em um vetor de tamanho 64. Esse vetor consolidado passa por camadas densas de decisão que alimentam duas saídas (Heads):
@@ -75,7 +89,7 @@ O vetor de contexto é concatenado ao estado interno do NPC, resultando em um ve
 
 ## 🎯 Sistema Dinâmico de Recompensas (`reward_callbacks`)
 
-Ao invés de programar recompensas estáticas diretamente no código do ambiente, o `EconomicEnv` (em `src/environment.py`) implementa um sistema altamente desacoplado baseado em regras injetáveis (`reward_callbacks`).
+Ao invés de programar recompensas estáticas diretamente no código do ambiente, o `EconomicEnv` (em `src/environment.py`) implementa um sistema altamente desacoplado baseado em regras injetáveis.
 
 Isso funciona de forma idêntica a um sistema de asserção de agentes (`agent.assert(status, callback)`), permitindo acoplar novas dinâmicas de jogo sem alterar a classe do ambiente:
 
@@ -96,7 +110,7 @@ Certifique-se de ter o Python 3.12+ instalado na sua máquina, bem como o gerenc
 
 ### 1. Clonar o Repositório
 ```bash
-git clone https://github.com/seu-usuario/ai-npcs.git
+git clone https://github.com/JonnathasLuiz/ai-npcs.git
 cd ai-npcs
 ```
 
@@ -118,3 +132,84 @@ python3 j-npcs.py
 ```
 
 Você verá no terminal a inicialização das regras dinâmicas, o estado simulado do NPC, as assinaturas do mapa e o resultado probabilístico da tomada de decisão realizada pelo cérebro da IA.
+
+---
+
+## 🚀 Como Começar
+
+### Usar Modelo Treinado
+```python
+from src.inference import NPCInference
+from src.environment import EconomicEnv
+
+npc = NPCInference("modelo_treinado.pt")
+env = EconomicEnv()
+
+obs, _ = env.reset()
+action = npc.get_action(obs)
+```
+
+### Adicionar Novo Tipo de Dado
+Siga o padrão de 3 passos documentado em [IMPLEMENTATION.md](./IMPLEMENTATION.md#adicionar-novos-tipos-de-dados):
+1. Adicionar constante em `config.py`
+2. Atualizar observações em `environment.py`
+3. Processar em `brain.py`
+
+### Treinar o Modelo
+```python
+from src.training import PPOTrainer
+from src.brain import NPCBrain
+from src.environment import EconomicEnv
+
+brain = NPCBrain()
+trainer = PPOTrainer(brain)
+env = EconomicEnv()
+
+trainer.train_episode(env, num_episodes=100)
+torch.save(brain.state_dict(), "modelo_final.pt")
+```
+
+---
+
+## 📖 Documentação Detalhada
+
+Consulte [IMPLEMENTATION.md](./IMPLEMENTATION.md) para:
+- ✅ Guia completo de uso (3 níveis de abstração)
+- ✅ Como adicionar novos tipos de observação (padrão passo a passo)
+- ✅ Como treinar o modelo (classe PPOTrainer)
+- ✅ Exemplos práticos prontos para usar
+- ✅ Princípio de abstração para simplificar desenvolvimento
+
+---
+
+## 📊 Tecnologias Utilizadas
+
+| Tecnologia | Versão | Propósito |
+|---|---|---|
+| **PyTorch** | 2.0+ | Redes Neurais e Computação Tensorial |
+| **Gymnasium** | 0.29+ | Ambiente de Aprendizado por Reforço |
+| **NumPy** | 1.24+ | Computação Científica |
+| **Python** | 3.12+ | Linguagem Base |
+
+---
+
+## 📝 Licença
+
+Este projeto está disponível sob a licença MIT.
+
+---
+
+## 👨‍💻 Autor
+
+Desenvolvido por **Jonnathas Luiz**  
+GitHub: [@JonnathasLuiz](https://github.com/JonnathasLuiz)
+
+---
+
+## 🎓 Referências Acadêmicas
+
+- **PPO (Proximal Policy Optimization):** Schulman et al., 2017
+- **Multi-Head Attention:** Vaswani et al., 2017 (Attention Is All You Need)
+- **Actor-Critic Methods:** A3C, Mnih et al., 2016
+- **Gymnasium:** OpenAI Environment Standard
+
